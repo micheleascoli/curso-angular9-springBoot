@@ -2,6 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { ContatoService } from '../contato.service';
 import { Contato } from './contato';
 import { FormBuilder, FormGroup, RequiredValidator, Validators } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
+import { ContatoDetalheComponent } from '../contato-detalhe/contato-detalhe.component'
+import { PageEvent } from '@angular/material/paginator';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-contato',
@@ -11,30 +15,85 @@ import { FormBuilder, FormGroup, RequiredValidator, Validators } from '@angular/
 export class ContatoComponent implements OnInit {
 
   formulario!: FormGroup;
-
+  contatos: Contato[] = [];
+  colunas = ['foto','id', 'nome', 'email', 'favorito'];
+  totalElementos = 0;
+  pagina = 0;
+  tamanho = 10;
+  pageSizeOptions :number[] = [10, 20]; 
 
   constructor(
     private service: ContatoService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar
   ) { }
 
   ngOnInit(): void {
+    this.montarFormulario();
+    this.listarContatos(this.pagina, this.tamanho);
+  }
+
+  montarFormulario(){
     this.formulario = this.fb.group({
       nome: ['', Validators.required],
       email: ['', [Validators.required, Validators.email] ]
     })
   }
 
+  listarContatos( pagina = 0 , tamanho = 0 ){
+    this.service.list(pagina, tamanho).subscribe(response => {
+      this.contatos = response.content;
+      this.totalElementos = response.totalElements;
+      this.pagina = response.number;
+    })
+  }
+
+  favoritar(contato: Contato){
+    this.service.favorite(contato).subscribe(response => {
+      contato.favorito = !contato.favorito;
+    })
+  }
+
   submit(){
-    
-    const erroNomeRequired = this.formulario.get('nome')?.errors?.['required'];
-    const erroEmailRequired =this.formulario.get('email')?.errors?.['required'];
-    const erroEmailInvalido =this.formulario.get('email')?.errors?.['email'];
+    const formValues = this.formulario.value;
+    const contato: Contato  = new Contato(formValues.nome, formValues.email);
+    this.service.save(contato).subscribe( resposta =>{
+      //Incluindo o novo contato e atualizando o array;
+      this.listarContatos();
+      this.snackBar.open('O contato foi adicionado!', 'Sucesso!', {
+        duration: 2000
+      })
+      this.formulario.reset();
 
+     
+    }) 
 
-    console.log('erroNomeRequired ', erroNomeRequired)
-    console.log('erroEmailRequired ', erroEmailRequired)
-    console.log('erroEmailInvalido ', erroEmailInvalido)
+  }
+
+  uploadFoto(event: any, contato: Contato){
+    const files = event.target.files;
+    if(files){
+      const foto = files[0];
+      const formData: FormData = new FormData();
+      formData.append("foto", foto);
+      this.service
+              .upload(contato, formData)
+              .subscribe(response => this.listarContatos());
+    }
+  }
+  
+  visualizarContato(contato: Contato){
+    this.dialog.open(ContatoDetalheComponent,{
+      width: '400px',
+      height: '450px',
+      data: contato
+    })
+  }
+
+  paginar(event: PageEvent){
+    this.pagina = event.pageIndex;
+    this.listarContatos(this.pagina, this.tamanho);
   }
 
 }

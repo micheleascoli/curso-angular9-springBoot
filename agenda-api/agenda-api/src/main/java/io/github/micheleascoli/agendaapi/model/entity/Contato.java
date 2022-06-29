@@ -22,6 +22,9 @@ public class Contato {
     private String email;
     @Column
     private Boolean favorito;
+    @Column
+    @Lob // Essa anotação diz ao jpa que a coluna é de byte
+    private byte[] foto;
 
 
 
